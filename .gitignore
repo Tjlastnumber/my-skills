@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+
+# Local env files
+.env
+.env.*
+!.env.example
+
+# Common local tool caches
+.pytest_cache/
+.mypy_cache/

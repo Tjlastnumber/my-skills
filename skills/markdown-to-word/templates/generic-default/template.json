@@ -1,0 +1,129 @@
+{
+  "name": "generic-default",
+  "title_text": "Document Title",
+  "features": {
+    "normalize_markdown": true,
+    "replace_mermaid": false,
+    "normalize_image_wrap": true,
+    "normalize_tables": true
+  },
+  "style_names": {
+    "body": "Normal",
+    "title": "Title",
+    "heading_1": "Heading 1",
+    "heading_2": "Heading 2",
+    "heading_3": "Heading 3",
+    "heading_4": "Heading 4",
+    "caption": "MDW Caption",
+    "abstract_label": "MDW Abstract Label",
+    "keywords": "MDW Keywords",
+    "reference": "MDW Reference",
+    "code": "MDW Code"
+  },
+  "style_profile": {
+    "fonts": {
+      "normal_east_asia": "等线",
+      "normal_ascii": "Times New Roman",
+      "title_east_asia": "等线",
+      "heading_east_asia": "等线",
+      "caption_east_asia": "等线",
+      "abstract_label_east_asia": "等线",
+      "keywords_east_asia": "等线",
+      "reference_east_asia": "等线",
+      "code_east_asia": "等线",
+      "code_ascii": "Courier New"
+    },
+    "sizes": {
+      "normal": 12,
+      "title": 16,
+      "heading_1": 16,
+      "heading_2": 14,
+      "heading_3": 13,
+      "heading_4": 12,
+      "caption": 10.5,
+      "abstract_label": 12,
+      "keywords": 12,
+      "reference": 11,
+      "code": 10.5,
+      "footer": 9
+    },
+    "page": {
+      "top_margin_cm": 2.54,
+      "bottom_margin_cm": 2.54,
+      "left_margin_cm": 2.54,
+      "right_margin_cm": 2.54,
+      "header_distance_cm": 1.5,
+      "footer_distance_cm": 1.5
+    },
+    "paragraph": {
+      "body_first_line_indent_pt": 24
+    },
+    "caption_paragraph": {
+      "default_space_before_lines": 0.5,
+      "default_space_after_lines": 0.5,
+      "figure_space_before_lines": 0.5,
+      "figure_space_after_lines": 0.5,
+      "table_space_before_lines": 0.5,
+      "table_space_after_lines": 0.5
+    },
+    "samples": {
+      "heading_1": "Chapter 1 Example Section",
+      "heading_2": "1.1 Example Subsection",
+      "heading_3": "1.1.1 Example Detail",
+      "body": "This is a body text style sample.",
+      "caption": "Figure 1-1 Example Caption"
+    }
+  },
+  "detection": {
+    "chapter_patterns": [],
+    "section_patterns": [],
+    "subsection_patterns": [],
+    "subsubsection_patterns": [],
+    "caption_patterns": [
+      "^(Figure|Table)\\s*[0-9A-Za-z\\-]+"
+    ],
+    "reference_heading_patterns": [
+      "^References?$",
+      "^Bibliography$"
+    ],
+    "reference_end_prefixes": [
+      "Appendix"
+    ],
+    "reference_item_pattern": "^\\[[0-9]+\\]",
+    "keywords_prefixes": [
+      "Keywords:"
+    ],
+    "abstract_label_prefixes": [
+      "Title:",
+      "Abstract:"
+    ],
+    "code_style_names": [
+      "Source Code",
+      "Code Block",
+      "Verbatim Char",
+      "MDW Code"
+    ]
+  },
+  "mermaid": {
+    "version": "11.4.2",
+    "background": "transparent",
+    "starters": [
+      "graph",
+      "flowchart",
+      "sequenceDiagram",
+      "classDiagram",
+      "stateDiagram",
+      "stateDiagram-v2",
+      "erDiagram",
+      "journey",
+      "gantt",
+      "pie",
+      "gitGraph",
+      "mindmap",
+      "timeline",
+      "requirementDiagram",
+      "quadrantChart",
+      "xychart-beta"
+    ]
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "templates": [
+    {
+      "id": "generic-default",
+      "name": "Generic Default",
+      "description": "General-purpose Markdown to Word template for reports, notes, and lightweight documents.",
+      "languages": [
+        "en",
+        "zh"
+      ],
+      "use_cases": [
+        "report",
+        "notes",
+        "proposal",
+        "general document"
+      ],
+      "preferred_input": "single markdown file",
+      "requires_title_text": false,
+      "mermaid_caption_policy": "optional",
+      "selection_hint": "Choose this for general documents without thesis-specific heading or caption rules.",
+      "template_path": "generic-default/template.json",
+      "preview_path": "generic-default/preview.md",
+      "sample_path": "generic-default/sample.md"
+    },
+    {
+      "id": "cn-thesis",
+      "name": "Chinese Thesis",
+      "description": "Chinese thesis-oriented template for academic manuscripts, dissertations, and graduation projects with thesis-style headings, captions, and numbered lists.",
+      "languages": [
+        "zh",
+        "en"
+      ],
+      "use_cases": [
+        "thesis",
+        "dissertation",
+        "academic manuscript",
+        "graduation project"
+      ],
+      "preferred_input": "multi-part manuscript",
+      "requires_title_text": true,
+      "mermaid_caption_policy": "adjacent caption required",
+      "selection_hint": "Choose this for Chinese thesis-style documents with chapter detection, Heiti headings, non-italic captions, references, and （n） numbered lists.",
+      "template_path": "cn-thesis/template.json",
+      "preview_path": "cn-thesis/preview.md",
+      "sample_path": "cn-thesis/sample.md"
+    }
+  ]
+}

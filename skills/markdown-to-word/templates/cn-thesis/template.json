@@ -1,0 +1,152 @@
+{
+  "name": "cn-thesis",
+  "title_text": "中文论文标题",
+  "features": {
+    "normalize_markdown": true,
+    "replace_mermaid": true,
+    "normalize_image_wrap": true,
+    "normalize_tables": true
+  },
+  "numbering": {
+    "decimal_level_text": {
+      "0": "（%1）",
+      "1": "（%2）",
+      "2": "（%3）",
+      "3": "（%4）",
+      "4": "（%5）",
+      "5": "（%6）",
+      "6": "（%7）",
+      "7": "（%8）",
+      "8": "（%9）"
+    }
+  },
+  "style_names": {
+    "body": "Normal",
+    "title": "Title",
+    "heading_1": "Heading 1",
+    "heading_2": "Heading 2",
+    "heading_3": "Heading 3",
+    "heading_4": "Heading 4",
+    "caption": "Thesis Caption",
+    "abstract_label": "Thesis Abstract Label",
+    "keywords": "Thesis Keywords",
+    "reference": "Thesis Reference",
+    "code": "Thesis Code"
+  },
+  "style_profile": {
+    "fonts": {
+      "normal_east_asia": "宋体",
+      "normal_ascii": "Times New Roman",
+      "title_east_asia": "黑体",
+      "heading_east_asia": "黑体",
+      "caption_east_asia": "宋体",
+      "abstract_label_east_asia": "黑体",
+      "keywords_east_asia": "宋体",
+      "reference_east_asia": "宋体",
+      "code_east_asia": "等线",
+      "code_ascii": "Courier New"
+    },
+    "sizes": {
+      "normal": 12,
+      "title": 18,
+      "heading_1": 18,
+      "heading_2": 15,
+      "heading_3": 14,
+      "heading_4": 12,
+      "caption": 10.5,
+      "abstract_label": 12,
+      "keywords": 12,
+      "reference": 12,
+      "code": 10.5,
+      "footer": 9
+    },
+    "page": {
+      "top_margin_cm": 3.8,
+      "bottom_margin_cm": 3.0,
+      "left_margin_cm": 3.0,
+      "right_margin_cm": 3.0,
+      "header_distance_cm": 3.0,
+      "footer_distance_cm": 2.3
+    },
+    "paragraph": {
+      "body_first_line_indent_pt": 24
+    },
+    "caption_paragraph": {
+      "default_space_before_lines": 0.5,
+      "default_space_after_lines": 0.5,
+      "figure_space_before_lines": 0.5,
+      "figure_space_after_lines": 0.5,
+      "table_space_before_lines": 0.5,
+      "table_space_after_lines": 0.5
+    },
+    "samples": {
+      "heading_1": "第1章 示例章节",
+      "heading_2": "1.1 示例小节",
+      "heading_3": "1.1.1 示例子节",
+      "body": "这是一个正文样式示例。",
+      "caption": "图 1-1 示例题注"
+    }
+  },
+  "detection": {
+    "chapter_patterns": [
+      "^(第\\d+章\\s*.+|结论与参考文献|摘要(?:\\s*\\(Abstract\\))?)$"
+    ],
+    "section_patterns": [
+      "^\\d+\\.\\d+\\s*.+$"
+    ],
+    "subsection_patterns": [
+      "^\\d+\\.\\d+\\.\\d+\\s*.+$"
+    ],
+    "subsubsection_patterns": [
+      "^\\d+\\.\\d+\\.\\d+\\.\\d+\\s*.+$"
+    ],
+    "caption_patterns": [
+      "^[图表]\\s*[0-9A-Za-z\\-]+"
+    ],
+    "reference_heading_patterns": [
+      "^参考文献$"
+    ],
+    "reference_end_prefixes": [
+      "附录"
+    ],
+    "reference_item_pattern": "^\\[[0-9]+\\]",
+    "keywords_prefixes": [
+      "关键词：",
+      "Keywords:"
+    ],
+    "abstract_label_prefixes": [
+      "题目：",
+      "Title:",
+      "摘要：",
+      "Abstract:"
+    ],
+    "code_style_names": [
+      "Source Code",
+      "Code Block",
+      "Verbatim Char",
+      "Thesis Code"
+    ]
+  },
+  "mermaid": {
+    "version": "11.4.2",
+    "background": "transparent",
+    "starters": [
+      "graph",
+      "flowchart",
+      "sequenceDiagram",
+      "classDiagram",
+      "stateDiagram",
+      "stateDiagram-v2",
+      "erDiagram",
+      "journey",
+      "gantt",
+      "pie",
+      "gitGraph",
+      "mindmap",
+      "timeline",
+      "requirementDiagram",
+      "quadrantChart",
+      "xychart-beta"
+    ]
+  }
+}
