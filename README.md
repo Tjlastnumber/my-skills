@@ -24,6 +24,7 @@
 | Skill | Purpose | Highlights | Status |
 | --- | --- | --- | --- |
 | [`markdown-to-word`](skills/markdown-to-word/README.md) | 将 Markdown 文稿转换为 DOCX/Word | 内置 `generic-default`、`cn-thesis` 模板，支持 `pandoc + python-docx` 后处理、Markdown 归一化、可选 Mermaid 渲染 | available |
+| [`prd-writer`](skills/prd-writer/README.md) | 两阶段引导式 PRD 生成，产出可用于 vibe coding 的精确需求文档 | 三视角需求诊断、概念版 → 落地版流程、四大盲区自检 | available |
 
 ## Featured Skill
 
