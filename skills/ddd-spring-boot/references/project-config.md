@@ -81,23 +81,35 @@ These live in the project's own exception package (e.g., `com.example.project.ba
 
 | Class | Extends | Message | Use When |
 |-------|---------|---------|----------|
-| `BizException` | `RuntimeException` | "业务异常" | Base business exception |
+| `BizException` | `RuntimeException` | "业务异常" | Base business exception (carries a business code) |
 | `NotFoundException` | `BizException` | custom | Resource not found |
 | `DeletedException` | `BizException` | custom | Resource already logically deleted |
+| `AlreadyExistsException` | `BizException` | custom | Resource already exists / duplicate creation |
 | `OperationException` | `BizException` | custom | General operation failure |
 | `OperationPermissionException` | `OperationException` | custom | No permission for the operation |
-| `AlreadyExistsException` | `RuntimeException` | custom | Resource already exists |
 | `GlobalExceptionHandler` | — | — | `@RestControllerAdvice` translating exceptions to `R.fail()` |
 
-The `GlobalExceptionHandler` ties the exception hierarchy to `R.fail()`:
+The `GlobalExceptionHandler` ties the exception hierarchy to `R.fail()`. The `code` field in `R`
+is the **business status code** (not the HTTP status code):
 
-| Exception | HTTP code in R |
-|-----------|---------------|
-| `NotFoundException` | 404 |
-| `OperationException` | 400 |
-| `OperationPermissionException` | 403 |
-| `BizException` / `ServiceException` | 500 |
-| Validation errors (`MethodArgumentNotValidException`) | 400 |
+| Exception | Business code in R |
+|-----------|-------------------|
+| `NotFoundException` | `40400` (or a more specific `404xx`) |
+| `DeletedException` | `40401` (or a more specific `404xx`) |
+| `AlreadyExistsException` | `40900` (or a more specific `409xx`) |
+| `OperationException` | `40000` (or a more specific `400xx`) |
+| `OperationPermissionException` | `40300` (or a more specific `403xx`) |
+| `BizException` / `ServiceException` | `50000` (or a more specific `500xx`) |
+| Validation errors (`MethodArgumentNotValidException`) | `40000` |
+
+### Adapting to Your Project
+
+- If the project already has a centralized error code class or enum, reuse it — map the generic
+  codes above to the project's actual constants.
+- If not, create one (e.g., `BizErrorCode`) and define all business codes there. Never hard-code
+  numeric literals in controllers or services.
+- Each domain module can reserve its own sub-range to avoid collisions (e.g., workspace in
+  `40410–40419`, notification in `40420–40429`).
 
 ## BaseEntity Fields
 

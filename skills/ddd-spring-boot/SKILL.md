@@ -192,38 +192,79 @@ If the project has an `api` module with interface contracts (e.g., `KubernetesAp
 
 ## Error Handling
 
-The project has a structured exception hierarchy. Use it — don't return null to signal errors or
-silently swallow invalid states.
+The project has a structured exception hierarchy and a centralized business status code system.
+Use it — don't return null to signal errors, silently swallow invalid states, or scatter magic
+numbers across controllers and services.
+
+### Exception Hierarchy
 
 The hierarchy (adapt names to your project):
 
 ```
 RuntimeException
-├── BizException          — base business exception
+├── BizException          — base business exception (carries a business code)
 │   ├── NotFoundException — resource not found
 │   ├── DeletedException  — resource already deleted
+│   ├── AlreadyExistsException — resource already exists / duplicate
 │   └── OperationException — general operation failure
 │       └── OperationPermissionException — permission denied
 └── ServiceException      — platform-level error
 ```
 
-A `GlobalExceptionHandler` (`@RestControllerAdvice`) translates these into `R.fail(code, message)`:
+### Business Status Codes
 
-| Exception | HTTP code in R |
-|-----------|---------------|
-| `NotFoundException` | 404 |
-| `OperationException` | 400 |
-| `OperationPermissionException` | 403 |
-| `BizException` / `ServiceException` | 500 |
-| Validation errors | 400 |
+`R<T>` carries a **business status code** in its `code` field. This is distinct from the HTTP
+status code — HTTP status conveys transport semantics; `R.code` conveys the business outcome.
+The `GlobalExceptionHandler` (`@RestControllerAdvice`) reads the code from the exception and
+returns `R.fail(code, message)`.
 
-When to throw:
+The recommended numbering scheme uses five-digit codes grouped by category:
 
-- Domain entity detects invalid state → throw the appropriate `BizException` subclass.
-- Application service encounters a business rule violation → throw `OperationException` or a more specific subclass.
+| Range | Category | Examples |
+|-------|----------|---------|
+| `200` | Success | `200` (ok) |
+| `40000–40099` | Parameter validation / general operation errors | `40000` (bad request), `40001` (invalid parameter) |
+| `40300–40399` | Permission errors | `40300` (forbidden), `40301` (no admin access) |
+| `40400–40499` | Resource not found / already deleted | `40400` (not found), `40401` (already deleted) |
+| `40900–40999` | Conflict / duplicate creation | `40900` (already exists), `40901` (name conflict) |
+| `50000–50099` | System or platform errors | `50000` (internal error), `50001` (third-party timeout) |
+
+Rules:
+
+- Define all business codes in a single class or enum (e.g., `BizErrorCode`). Never hard-code
+  numeric literals in controllers, services, or domain entities — always reference the constant.
+- `BizException` and its subclasses carry a `code` field. Set it via the constructor.
+- `GlobalExceptionHandler` extracts `code` from the exception and passes it to `R.fail(code, message)`.
+  For exceptions without a code (e.g., validation errors), the handler assigns a default from the
+  appropriate range.
+- Each domain module can define its own sub-range within the category to avoid collisions across
+  modules (e.g., workspace errors in `40410–40419`, notification errors in `40420–40429`).
+
+### Exception-to-Code Mapping
+
+The `GlobalExceptionHandler` maps exceptions to business codes:
+
+| Exception | Business code in R |
+|-----------|-------------------|
+| `NotFoundException` | `40400` (or a more specific `404xx`) |
+| `DeletedException` | `40401` (or a more specific `404xx`) |
+| `AlreadyExistsException` | `40900` (or a more specific `409xx`) |
+| `OperationException` | `40000` (or a more specific `400xx`) |
+| `OperationPermissionException` | `40300` (or a more specific `403xx`) |
+| `BizException` / `ServiceException` | `50000` (or a more specific `500xx`) |
+| Validation errors (`MethodArgumentNotValidException`) | `40000` |
+
+### When to Throw
+
+- Domain entity detects invalid state → throw the appropriate `BizException` subclass with a specific code.
+- Application service encounters a business rule violation → throw `OperationException` (or a more specific subclass) with a specific code.
 - Catch exceptions locally only when adapting third-party behavior (e.g., Kubernetes client failures). Let the `GlobalExceptionHandler` handle the rest.
 
 Error messages can be in Chinese or English — match the style of the surrounding code.
+
+For code templates (including `BizErrorCode`, `BizException` with code, and `GlobalExceptionHandler`),
+read `references/code-templates.md`. For project-specific adaptation notes, read
+`references/project-config.md`.
 
 ## Domain Model
 

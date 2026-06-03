@@ -16,6 +16,9 @@ Copy-paste templates for common tasks. Adjust names and packages to match the pr
 10. [Domain Service](#domain-service)
 11. [Application Service Test](#application-service-test)
 12. [Domain Entity Test](#domain-entity-test)
+13. [Business Error Code Definitions](#business-error-code-definitions)
+14. [BizException with Code](#bizexception-with-code)
+15. [GlobalExceptionHandler](#globalexceptionhandler)
 
 ## Controller
 
@@ -598,6 +601,179 @@ class FeatureTest {
             Feature feature = Feature.create("name", "desc");
             assertThrows(OperationException.class, () -> feature.updateInfo("", "desc"));
         }
+    }
+}
+```
+
+## Business Error Code Definitions
+
+Centralize all business status codes in one place. Use a class with `public static final int` constants
+(or an enum if the project prefers). Never hard-code numeric literals elsewhere.
+
+```java
+package com.example.project.backend.exception;
+
+public final class BizErrorCode {
+
+    private BizErrorCode() {}
+
+    public static final int SUCCESS = 200;
+
+    // 40000–40099: parameter / general operation errors
+    public static final int BAD_REQUEST = 40000;
+    public static final int INVALID_PARAMETER = 40001;
+
+    // 40300–40399: permission errors
+    public static final int FORBIDDEN = 40300;
+    public static final int NO_ADMIN_ACCESS = 40301;
+
+    // 40400–40499: resource not found / already deleted
+    public static final int NOT_FOUND = 40400;
+    public static final int ALREADY_DELETED = 40401;
+
+    // 40900–40999: conflict / duplicate
+    public static final int ALREADY_EXISTS = 40900;
+    public static final int NAME_CONFLICT = 40901;
+
+    // 50000–50099: system / platform errors
+    public static final int INTERNAL_ERROR = 50000;
+    public static final int THIRD_PARTY_TIMEOUT = 50001;
+}
+```
+
+To add domain-specific sub-ranges, extend the base class or define additional constants
+in a domain-scoped subclass:
+
+```java
+public final class WorkspaceErrorCode extends BizErrorCode {
+    private WorkspaceErrorCode() {}
+
+    public static final int WORKSPACE_NOT_FOUND = 40410;
+    public static final int WORKSPACE_NAME_DUPLICATE = 40910;
+    public static final int WORKSPACE_LIMIT_EXCEEDED = 40010;
+}
+```
+
+## BizException with Code
+
+`BizException` carries a business code. Subclasses set a default code but allow overrides:
+
+```java
+package com.example.project.backend.exception;
+
+public class BizException extends RuntimeException {
+
+    private final int code;
+
+    public BizException(int code, String message) {
+        super(message);
+        this.code = code;
+    }
+
+    public BizException(String message) {
+        this(BizErrorCode.INTERNAL_ERROR, message);
+    }
+
+    public BizException(int code, String message, Throwable cause) {
+        super(message, cause);
+        this.code = code;
+    }
+
+    public int getCode() {
+        return code;
+    }
+}
+```
+
+Specific subclasses default to the appropriate code:
+
+```java
+package com.example.project.backend.exception;
+
+public class NotFoundException extends BizException {
+
+    public NotFoundException(String message) {
+        super(BizErrorCode.NOT_FOUND, message);
+    }
+}
+
+public class AlreadyExistsException extends BizException {
+
+    public AlreadyExistsException(String message) {
+        super(BizErrorCode.ALREADY_EXISTS, message);
+    }
+}
+
+public class OperationException extends BizException {
+
+    public OperationException(String message) {
+        super(BizErrorCode.BAD_REQUEST, message);
+    }
+
+    public OperationException(int code, String message) {
+        super(code, message);
+    }
+}
+
+public class OperationPermissionException extends OperationException {
+
+    public OperationPermissionException(String message) {
+        super(BizErrorCode.FORBIDDEN, message);
+    }
+}
+
+public class DeletedException extends BizException {
+
+    public DeletedException(String message) {
+        super(BizErrorCode.ALREADY_DELETED, message);
+    }
+}
+```
+
+## GlobalExceptionHandler
+
+Translates exceptions into `R.fail(code, message)`. Extracts the business code from `BizException`
+and falls back to defaults for other exception types:
+
+```java
+package com.example.project.backend.exception;
+
+import com.example.project.common.domain.R;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+@Slf4j
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(BizException.class)
+    public R<Void> handleBizException(BizException e) {
+        log.warn("Business error: code={}, message={}", e.getCode(), e.getMessage());
+        return R.fail(e.getCode(), e.getMessage());
+    }
+
+    @ExceptionHandler(ServiceException.class)
+    public R<Void> handleServiceException(ServiceException e) {
+        log.error("Service error: {}", e.getMessage(), e);
+        return R.fail(BizErrorCode.INTERNAL_ERROR, e.getMessage());
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public R<Void> handleValidationException(MethodArgumentNotValidException e) {
+        FieldError fieldError = e.getBindingResult().getFieldError();
+        String message = fieldError != null
+                ? fieldError.getDefaultMessage()
+                : "参数校验失败";
+        return R.fail(BizErrorCode.INVALID_PARAMETER, message);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public R<Void> handleException(Exception e) {
+        log.error("Unexpected error: {}", e.getMessage(), e);
+        return R.fail(BizErrorCode.INTERNAL_ERROR, "系统异常，请联系管理员");
     }
 }
 ```
