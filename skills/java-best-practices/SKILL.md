@@ -102,14 +102,14 @@ public final class TaskConstants {
     public static final String DATE_RANGE_INVALID = "计划开始时间不能晚于计划结束时间";
     public static final String STATUS_OPERATION_NOT_ALLOWED = "任务状态为 %s，不允许此操作";
     public static final String TASK_NOT_FOUND = "任务不存在: %s";
-
-    public static final String BUSINESS_TYPE_APPROVAL = "TASK_APPROVAL";
 }
 
 // Task.java 中使用
 throw new OperationException(TaskConstants.REJECT_REASON_REQUIRED);
 throw new OperationException(String.format(TaskConstants.STATUS_OPERATION_NOT_ALLOWED, this.status.getLabel()));
 ```
+
+`"TASK_APPROVAL"` 这类业务类型标识具有有限取值集合，属于魔法字符串，应定义为枚举（例如 `ApprovalBusinessType.TASK_APPROVAL`），而不是定义在 Constants 类中。
 
 ### 1.3 各层的处理策略
 
@@ -138,11 +138,72 @@ private String title;
 
 ---
 
-## 2. 使用 Lombok 注解替代手写 get/set
+## 2. Swagger 枚举请求参数说明
+
+请求接口中的枚举参数必须在 Swagger 中直接说明每个合法取值及其业务含义。该规则同时适用于以下两种情况：
+
+- 字段类型直接是 Java 枚举。
+- 字段类型是 `String`，但其值需要与系统中的某个枚举 code 对应。
+
+虽然当前项目多数请求 DTO 使用 `String` 接收枚举 code，再由应用层转换为领域枚举，但 Swagger 不能据此自动识别可选值。缺少说明会使调用方不知道应传 `XHIGH` 还是“紧急”，也无法了解每个值的业务语义。
+
+### 2.1 请求体 DTO 字段
+
+在对应字段上使用 `@Schema`：
+
+- `description` 必须列出“值 - 含义”。
+- `allowableValues` 必须列出接口实际接收的所有值。
+- 外部值以枚举的 `code` 为准；不要默认使用 Java 枚举常量名。先检查 `fromCode`、`valueOf`、Jackson 配置或现有转换逻辑，确认接口协议后再编写文档。
+
+```java
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(
+        description = "任务优先级：XHIGH-紧急，HIGH-高，MEDIUM-中，NORMAL-普通，LOW-低",
+        allowableValues = {"XHIGH", "HIGH", "MEDIUM", "NORMAL", "LOW"}
+)
+private String priority;
+```
+
+即使字段直接声明为枚举，也保留 `description`，确保 Swagger 展示每个值的中文业务含义：
+
+```java
+@Schema(description = "任务优先级：XHIGH-紧急，HIGH-高，MEDIUM-中，NORMAL-普通，LOW-低")
+private TaskPriority priority;
+```
+
+### 2.2 路径参数和查询参数
+
+对于 `@PathVariable`、`@RequestParam` 中的枚举型参数或枚举 code 字符串，使用 `@Parameter` 和内嵌 `@Schema` 说明：
+
+```java
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
+
+public Result<Void> submit(
+        @PathVariable String id,
+        @Parameter(
+                description = "审批动作：SUBMIT-提交，RESUBMIT-重新提交",
+                schema = @Schema(allowableValues = {"SUBMIT", "RESUBMIT"})
+        )
+        @PathVariable String actionCode) {
+    // ...
+}
+```
+
+### 2.3 不要做的事
+
+- 不要只写“状态枚举”“优先级枚举”或“详见枚举类”。Swagger 文档必须直接展示每个合法值及其含义。
+- 不要把 Java 枚举常量名当作接口值，除非现有绑定或转换逻辑明确以该名称作为协议值。
+- 不要遗漏字符串类型的枚举 code 字段。类型是 `String` 不代表它不需要枚举说明。
+
+---
+
+## 3. 使用 Lombok 注解替代手写 get/set
 
 本项目的 Lombok 依赖已在 pom.xml 中配置。所有 Java 类应根据所处层级使用恰当的 Lombok 注解，不要手写 getter/setter 方法。
 
-### 2.1 各层 Lombok 注解规范
+### 3.1 各层 Lombok 注解规范
 
 **领域层 — 聚合根 / 实体：**
 - 使用 `@Getter`，不使用 `@Setter`
@@ -224,7 +285,7 @@ public class TaskApplicationService {
 }
 ```
 
-### 2.2 不要做的事
+### 3.2 不要做的事
 
 - 不要手写 getter/setter —— 用 Lombok 注解替代。`ApprovalInstance.java` 中 150+ 行手写 getter/setter 就是反面教材，应该用 `@Getter` + `@Setter` 替代。
 - 不要在领域聚合根上使用 `@Data` —— 这会暴露 setter，破坏封装性。
@@ -232,11 +293,11 @@ public class TaskApplicationService {
 
 ---
 
-## 3. 日志规范
+## 4. 日志规范
 
 本项目当前没有任何日志记录，后续开发应逐步补齐。日志使用 Lombok 的 `@Slf4j` 注解。
 
-### 3.1 哪些类需要日志
+### 4.1 哪些类需要日志
 
 | 类 | 使用 @Slf4j | 说明 |
 |---|---|---|
@@ -247,7 +308,7 @@ public class TaskApplicationService {
 | Domain 聚合根/实体 | 否 | 领域模型保持纯粹，不依赖日志框架 |
 | DO / DTO | 否 | 纯数据对象 |
 
-### 3.2 日志级别指南
+### 4.2 日志级别指南
 
 ```java
 @Slf4j
@@ -278,7 +339,7 @@ public class TaskApplicationService {
 | `log.error` | 系统异常、不可预期的错误（try-catch 中捕获的异常） |
 | `log.debug` | 开发调试信息，排查问题时使用 |
 
-### 3.3 日志注意事项
+### 4.3 日志注意事项
 
 - 使用 `{}` 占位符，不要字符串拼接：`log.info("任务创建, id={}", id)` 而非 `log.info("任务创建, id=" + id)`
 - 不要记录敏感信息（密码、token）
@@ -294,6 +355,7 @@ public class TaskApplicationService {
 - [ ] 魔法字符串已定义为枚举
 - [ ] 描述性字符串已提取到 Constants 类
 - [ ] DTO 校验消息引用常量
+- [ ] Swagger 已说明所有枚举型请求参数及枚举 code 字符串的合法值和业务含义
 - [ ] 没有手写 getter/setter（使用 Lombok 注解）
 - [ ] 聚合根只用了 `@Getter`，没有 `@Setter`/`@Data`
 - [ ] Service/Controller 使用了 `@RequiredArgsConstructor` + `@Slf4j`
