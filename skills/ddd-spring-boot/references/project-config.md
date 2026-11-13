@@ -1,181 +1,186 @@
-# Project Configuration Reference
+# Optional Project Configuration Examples
 
-This file explains how to adapt the `ddd-spring-boot` skill to a specific project. The skill
-itself is generic; the values below vary per project.
+This document helps adapt **selected** recommendations to a target project. None of the
+module names, packages, dependencies, classes, fields, or script paths below is mandatory.
+Inspect the actual project first; use its existing configuration. Where a relevant choice is
+missing, ask the user before adopting an example. See [project-conventions.md](project-conventions.md).
 
-## Table of Contents
+## Contents
 
-1. [Build Environment](#build-environment)
-2. [Maven Modules](#maven-modules)
-3. [Package Names](#package-names)
-4. [Common Infrastructure Classes](#common-infrastructure-classes)
-5. [Exception Classes](#exception-classes)
-6. [BaseEntity Fields](#baseentity-fields)
-7. [Domain Base Classes](#domain-base-classes)
-8. [Build Script Paths](#build-script-paths)
+- [Environment](#environment)
+- [Optional Module Layout](#optional-module-layout)
+- [Optional Package Layout](#optional-package-layout)
+- [Optional Common Infrastructure](#optional-common-infrastructure)
+- [Optional Exception Configuration](#optional-exception-configuration)
+- [Optional Persistence and Domain Base Types](#optional-persistence-and-domain-base-types)
+- [Build Entry Points and Commands](#build-entry-points-and-commands)
 
-## Build Environment
+## Environment
 
-| Item | Value (adjust per project) |
-|------|---------------------------|
-| Java version | Per project (read from `pom.xml` `maven.compiler.source` or `<java.version>`) |
-| Maven version | 3.6.3+ |
-| Parent POM | Your organization's parent POM |
-| Group ID | Your project's group ID |
-| `.sdkmanrc` | Optional: pins Java/Maven versions |
+| Item | How to determine the actual setting |
+| --- | --- |
+| Java | Effective Maven `release` / `maven.compiler.release`, source/target, parent properties such as `java.version`, or Gradle toolchain/compatibility |
+| Spring Boot | Build plugins, parent, dependency management and resolved dependencies |
+| Maven/Gradle | Existing wrapper configuration, build files, project instructions |
+| Parent POM / group ID | Existing `pom.xml` and inherited configuration |
+| `.sdkmanrc` | Optional project-managed environment pins; do not create unless requested |
 
-## Maven Modules
+Do not infer versions from these examples. Match resolved Spring/Servlet/Validation namespaces
+and the chosen Java language level before adapting code.
 
-A typical DDD project may have these modules (adjust to match yours):
+## Optional Module Layout
 
-| Module | Purpose |
-|--------|---------|
-| `api` | Shared API contracts and models (optional) |
-| `core` | Proxy / gateway / infrastructure-facing service (optional) |
-| `backend` | Business / domain / data service |
+One possible multi-module layout, useful when a project actually needs separate contracts,
+a gateway, and a business service:
 
-## Package Names
+```text
+<project-root>/
+├── api/       # Shared contracts/models; no service implementation
+├── core/      # Gateway/proxy service (optional)
+├── backend/   # Business service
+└── pom.xml
+```
 
-Adjust to your project's base package:
+For this option, `core` implements `api` interfaces and `backend` can consume `api` models.
+Neither service needs to depend on the other service's implementation. If an API contract
+changes, inspect its implementations and consumers. Do not invent these modules for a project
+that has no such deployment or contract boundary.
 
-| Module | Base Package (example) |
-|--------|----------------------|
+An optional gateway `core` may have `config`, `controller`, `filter`, `model`, `service`,
+`support`, and `template` packages. Reactive types such as `Mono` and `ServerWebExchange`
+belong there only when its selected framework needs them. A gateway need not have the same
+domain layering as the business service. Kubernetes-facing examples are scenario-specific,
+not an assumed dependency.
+
+## Optional Package Layout
+
+Example packages for the selected module layout:
+
+| Module | Illustrative base package |
+| --- | --- |
 | `api` | `com.example.project.api` |
 | `core` | `com.example.project.core` |
 | `backend` | `com.example.project.backend` |
 
-## Common Infrastructure Classes
+Within a business service, one possible arrangement is:
 
-These classes provide unified response wrapping and pagination support. Every project using this
-skill needs them. There are two options:
-
-### Option A: Project already has a common library
-
-If your organization provides a common-core library (like `ruoyi-common`, `xxx-common-core`, etc.),
-use the classes from there. Map the generic names to your library:
-
-| Class | Generic Package | Purpose |
-|-------|----------------|---------|
-| `R<T>` | `com.example.project.common.domain.R` | Return wrapper: `R.ok(data)`, `R.fail(code, msg)` |
-| `BaseController` | `com.example.project.common.web.controller.BaseController` | Provides `startPage()`, `getDataTable()` |
-| `TableDataInfo<T>` | `com.example.project.common.web.page.TableDataInfo` | Paginated response wrapper |
-| `ServiceException` | `com.example.project.common.exception.ServiceException` | Platform-level service exception |
-
-### Option B: No common library — use the bundled implementations
-
-Complete, ready-to-use implementations (Java 8 compatible, works on any modern Java) are in `scripts/common-infrastructure/`:
-
-| File | Class |
-|------|-------|
-| `scripts/common-infrastructure/R.java` | `R<T>` — unified response wrapper |
-| `scripts/common-infrastructure/TableDataInfo.java` | `TableDataInfo<T>` — paginated response |
-| `scripts/common-infrastructure/BaseController.java` | `BaseController` — pagination base (uses PageHelper) |
-| `scripts/common-infrastructure/ServiceException.java` | `ServiceException` — platform exception |
-
-Copy these files into your project's common package and rename the package declarations.
-`BaseController` requires `com.github.pagehelper:pagehelper-spring-boot-starter` as a dependency.
-
-## Exception Classes
-
-These live in the project's own exception package (e.g., `com.example.project.backend.exception`):
-
-| Class | Extends | Message | Use When |
-|-------|---------|---------|----------|
-| `BizException` | `RuntimeException` | "业务异常" | Base business exception (carries a business code) |
-| `NotFoundException` | `BizException` | custom | Resource not found |
-| `DeletedException` | `BizException` | custom | Resource already logically deleted |
-| `AlreadyExistsException` | `BizException` | custom | Resource already exists / duplicate creation |
-| `OperationException` | `BizException` | custom | General operation failure |
-| `OperationPermissionException` | `OperationException` | custom | No permission for the operation |
-| `GlobalExceptionHandler` | — | — | `@RestControllerAdvice` translating exceptions to `R.fail()` |
-
-The `GlobalExceptionHandler` ties the exception hierarchy to `R.fail()`. The `code` field in `R`
-is the **business status code** (not the HTTP status code):
-
-| Exception | Business code in R |
-|-----------|-------------------|
-| `NotFoundException` | `40400` (or a more specific `404xx`) |
-| `DeletedException` | `40401` (or a more specific `404xx`) |
-| `AlreadyExistsException` | `40900` (or a more specific `409xx`) |
-| `OperationException` | `40000` (or a more specific `400xx`) |
-| `OperationPermissionException` | `40300` (or a more specific `403xx`) |
-| `BizException` / `ServiceException` | `50000` (or a more specific `500xx`) |
-| Validation errors (`MethodArgumentNotValidException`) | `40000` |
-
-### Adapting to Your Project
-
-- If the project already has a centralized error code class or enum, reuse it — map the generic
-  codes above to the project's actual constants.
-- If not, create one (e.g., `BizErrorCode`) and define all business codes there. Never hard-code
-  numeric literals in controllers or services.
-- Each domain module can reserve its own sub-range to avoid collisions (e.g., workspace in
-  `40410–40419`, notification in `40420–40429`).
-
-## BaseEntity Fields
-
-Location: `com.example.project.backend.domain.BaseEntity`
-
-| Field | Type | Fill Strategy | Purpose |
-|-------|------|---------------|---------|
-| `createTime` | `LocalDateTime` | `FieldFill.INSERT` | Record creation time |
-| `updateTime` | `LocalDateTime` | `FieldFill.INSERT_UPDATE` | Last update time |
-| `createBy` | `String` | `FieldFill.INSERT` | Creator user ID |
-| `updateBy` | `String` | `FieldFill.UPDATE` | Last updater user ID |
-| `deletedFlag` | `Integer` | `@TableLogic` | Logical delete: 0 = active, 1 = deleted |
-
-## Domain Base Classes
-
-| Class | Location | Purpose |
-|-------|----------|---------|
-| `AggregateRoot` | `...domain.AggregateRoot` | Marker interface for aggregate roots |
-| `BaseEntity` | `...domain.BaseEntity` | Audit fields + logical delete (see above) |
-| `DomainEvent` | `...domain.event.DomainEvent` | Abstract base with `eventId` and `occurredOn` |
-| `DomainEventPublisher` | `...domain.event.DomainEventPublisher` | Wraps Spring `ApplicationEventPublisher` |
-
-## Build Script Paths
-
-Adjust the script names to match your project:
-
-| Script | Path (example) | Purpose |
-|--------|---------------|---------|
-| Environment check | `./scripts/ensure-build-env.sh` | Verify Java/Maven versions |
-| Maven wrapper | `./scripts/mvn-wrapper.sh` | Runs Maven with project settings |
-
-### Common Build Commands
-
-Replace `./scripts/mvn-wrapper.sh` with your actual Maven wrapper script:
-
-```bash
-# Validate environment
-./scripts/ensure-build-env.sh
-
-# Run all tests
-./scripts/mvn-wrapper.sh test
-
-# Build all without tests
-./scripts/mvn-wrapper.sh clean package -DskipTests
-
-# Full install
-./scripts/mvn-wrapper.sh clean install
-
-# Test only backend module
-./scripts/mvn-wrapper.sh -pl backend -am test
-
-# Test only core module
-./scripts/mvn-wrapper.sh -pl core -am test
-
-# Build only api module
-./scripts/mvn-wrapper.sh -pl api -am package -DskipTests
-
-# Run backend locally
-./scripts/mvn-wrapper.sh -pl backend -am spring-boot:run -Dspring-boot.run.profiles=local
-
-# Run core locally
-./scripts/mvn-wrapper.sh -pl core -am spring-boot:run -Dspring-boot.run.profiles=local
-
-# Single test class
-./scripts/mvn-wrapper.sh -pl backend -am -Dtest=FeatureApplicationServiceTest test
-
-# Single test method
-./scripts/mvn-wrapper.sh -pl backend -am -Dtest='FeatureApplicationServiceTest#shouldCreate' test
+```text
+backend/
+├── config/
+├── constant/
+├── controller/
+├── application/
+│   ├── dto/workspace/       # CreateWorkspaceCommand, WorkspaceView, etc.
+│   ├── eventhandler/
+│   └── service/
+├── domain/
+│   ├── workspace/          # Aggregate, repository contract, value objects
+│   ├── notification/
+│   └── event/              # Event/dispatch contracts if shared
+├── exception/
+├── infrastructure/
+│   ├── persistence/mapper/
+│   └── repository/
+└── utils/
 ```
+
+Package-by-feature and other existing layouts can express the same boundaries. The names,
+shared constants, utility package, and event locations are not DDD requirements. For design
+responsibilities rather than package choices, see [architecture.md](architecture.md).
+
+## Optional Common Infrastructure
+
+Only when the user selects these contracts and the project lacks equivalents, consider the
+bundled implementations. Do not add a common library simply because this table mentions it.
+
+| Class | Illustrative target package | Bundled source |
+| --- | --- | --- |
+| `R<T>` | `com.example.project.common.domain` | `scripts/common-infrastructure/R.java` |
+| `TableDataInfo<T>` | `com.example.project.common.web.page` | `scripts/common-infrastructure/TableDataInfo.java` |
+| `BaseController` | `com.example.project.common.web.controller` | `scripts/common-infrastructure/BaseController.java` |
+| `ServiceException` | `com.example.project.common.exception` | `scripts/common-infrastructure/ServiceException.java` |
+
+The source paths are relative to the skill root. Existing libraries (e.g. a project's common
+module) may already provide equivalent classes; reuse them after checking signatures.
+
+### Compatibility and adaptation gates
+
+- The bundled code uses Java 8-compatible syntax, but syntax compatibility does not imply
+  compatibility with every Spring Boot version.
+- `BaseController.java` imports `javax.servlet.http.HttpServletRequest`. Spring Boot 3 uses
+  `jakarta.servlet`; adapt and test it if the user selects this option. It is not a drop-in
+  Boot 3 implementation.
+- The controller base depends on PageHelper; choose a compatible dependency only if the user
+  selects PageHelper. Do not add it when the project already uses another pagination strategy.
+- The bundled `BaseController` accepts request `orderBy` text directly. **Do not use that path
+  with untrusted input unchanged.** If adopting it, map allowed sort fields/directions to
+  trusted SQL identifiers before calling PageHelper. Validate/bound `pageNum` and `pageSize` too.
+- `R` has default success/failure codes `200`/`500`. If the optional five-digit business-code
+  scheme is selected, use explicit `R.fail(code, message)`; do not assume `R.fail(message)`
+  emits `50000`. Coordinate contracts with clients before changing defaults.
+- Review packages, serialization, HTTP semantics, exception-message exposure, and pagination
+  behavior before copying. The original bundled files are unchanged by this documentation split.
+
+## Optional Exception Configuration
+
+If selected, place `BizErrorCode`, `BizException`, `NotFoundException`, `DeletedException`,
+`AlreadyExistsException`, `OperationException`, `OperationPermissionException`, and
+`GlobalExceptionHandler` in the project's chosen application/common boundary. Package
+`com.example.project.backend.exception` is an example, not a required location.
+
+The full optional hierarchy/code ranges live in
+[project-conventions.md](project-conventions.md#exceptions-and-business-codes), and compatible
+example implementations live in [project-templates.md](project-templates.md). Keep those as
+the source for defaults instead of maintaining another mapping table here. Reuse existing
+codes when present. Domain-specific code classes can hold independent constants, avoiding
+inheritance from final utility classes.
+
+## Optional Persistence and Domain Base Types
+
+The following audit/logical-delete fields are one possible MyBatis-Plus mapping, **not required
+domain fields**:
+
+| Field | Example type | Example persistence strategy |
+| --- | --- | --- |
+| `createTime` | `LocalDateTime` | `FieldFill.INSERT` |
+| `updateTime` | `LocalDateTime` | `FieldFill.INSERT_UPDATE` |
+| `createBy` | `String` | `FieldFill.INSERT` |
+| `updateBy` | `String` | `FieldFill.UPDATE` |
+| `deletedFlag` | `Integer` | `@TableLogic`, 0 active / 1 deleted |
+
+If the user chooses direct domain/persistence mapping, an audit `BaseEntity` and MyBatis-Plus
+annotations can express this implementation trade-off. Alternatively keep audit fields on a
+separate persistence model and map to domain factories. Do not change the project's chosen
+strategy as part of this skill without a request.
+
+An `AggregateRoot` marker interface is optional. `DomainEvent` metadata (`eventId`, occurrence
+time) and a `DomainEventPublisher` port may be useful, but neither an inheritance hierarchy
+nor a Spring publisher wrapper is required. If Spring events are selected, explicitly verify
+transaction-aware handling; plain `publishEvent` alone is not an after-commit guarantee.
+
+## Build Entry Points and Commands
+
+Inspect scripts before using them. The historical example uses
+`./scripts/ensure-build-env.sh` and `./scripts/mvn-wrapper.sh`; these are **not bundled by this
+skill** and may not exist in the target project. Use `./mvnw`, `./gradlew`, an existing script,
+or the project's documented direct command as applicable. Do not create or require a wrapper
+without user selection.
+
+For a project that actually uses Maven, replace `<maven-entry>` below with its detected entry
+point and replace module/profile/test names. The placeholders are not literal shell commands.
+
+| Action | Example command pattern |
+| --- | --- |
+| All tests | `<maven-entry> test` |
+| Package without running tests | `<maven-entry> clean package -DskipTests` |
+| Install | `<maven-entry> clean install` |
+| Test module and required dependencies | `<maven-entry> -pl backend -am test` |
+| Build contract module | `<maven-entry> -pl api -am package -DskipTests` |
+| Test one class | `<maven-entry> -pl backend -am -Dtest=SomeTest test` |
+| Test one method | `<maven-entry> -pl backend -am -Dtest='SomeTest#method' test` |
+| Run a service | `<maven-entry> -pl backend spring-boot:run -Dspring-boot.run.profiles=local` |
+
+With `-am`, test filters also affect upstream modules; adapt the test strategy when those
+modules have no matching tests. Run the Spring Boot goal only on the runnable service module;
+build/install its dependencies first if necessary, rather than trying to start every module.
+An environment-check command is useful only if the project actually provides one.

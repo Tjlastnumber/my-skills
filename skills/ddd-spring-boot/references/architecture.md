@@ -1,198 +1,65 @@
-# Architecture Reference
+# DDD Architecture Reference
 
-## Table of Contents
+This document describes responsibilities and dependency boundaries, not a mandatory package
+or Maven module layout. Names such as `controller` and `application` identify roles;
+map them to the target project's existing structure.
 
-1. [Module Structure](#module-structure)
-2. [Backend Layering](#backend-layering)
-3. [Package Layout](#package-layout)
-4. [Inter-Module Dependencies](#inter-module-dependencies)
-5. [Core Module](#core-module)
+## Layer Responsibilities
 
-## Module Structure
+| Role | Responsibility | Keep out |
+| --- | --- | --- |
+| Interface adapter (e.g. HTTP controller) | Translate requests, validate transport input, call use cases, translate results/errors | Business state transitions and persistence access |
+| Application service | Orchestrate use cases, load/save aggregates through ports, define transaction boundaries, coordinate event dispatch | Business invariants that belong to the domain |
+| Domain | Aggregates, entities, value objects, domain services, domain events, business-facing repository contracts | HTTP response wrappers, controller types, ORM query builders, transport status codes |
+| Infrastructure | Implement repositories and external-service ports; handle persistence, messaging, and third-party APIs | Owning business rules merely because it has access to stored data |
 
-The project is a Maven multi-module build:
+## Dependency Direction
 
-```
-<project-root>/
-├── api/       — shared API contracts and models (no implementation)
-├── core/      — proxy / gateway / Kubernetes-facing Spring Boot service
-├── backend/   — business / domain / data Spring Boot service
-└── pom.xml    — parent POM
-```
-
-**api** is the shared contract module. It defines interfaces (e.g., `KubernetesApi`) and data models
-(e.g., `JupyterSession`, `LaunchRequest`) that `core` implements and `backend` consumes. Keep
-external API contracts here — never in `backend`. (Class names are illustrative; adapt to your project.)
-
-**core** is a gateway/proxy service. It handles authentication, routing, and Kubernetes API calls.
-It implements interfaces from `api`.
-
-**backend** is the main business service. It follows DDD layering internally.
-
-## Backend Layering
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  controller                                                 │
-│  HTTP adapter. Receives requests, validates, delegates.     │
-│  Returns R<T> or TableDataInfo<?>.                          │
-├─────────────────────────────────────────────────────────────┤
-│  application.service                                        │
-│  Use-case orchestration. Manages transactions, publishes    │
-│  domain events, converts domain objects to DTOs.            │
-│  Contains no business rules.                                │
-│                                                             │
-│  application.dto                                            │
-│  Input/output data structures: *Command, *Query, *View.     │
-├─────────────────────────────────────────────────────────────┤
-│  domain                                                     │
-│  Entities, value objects, domain services, domain events,   │
-│  repository interfaces. Business invariants live here.      │
-├─────────────────────────────────────────────────────────────┤
-│  infrastructure                                             │
-│  Repository implementations, MyBatis mappers, third-party   │
-│  adapters. Implements domain-defined interfaces.             │
-└─────────────────────────────────────────────────────────────┘
+```text
+interface adapters → application → domain ← infrastructure
 ```
 
-### Dependency Flow
+- Application services depend on domain contracts rather than concrete repository adapters.
+- Infrastructure implements inward-facing interfaces (dependency inversion).
+- Runtime calls can reach infrastructure through those interfaces; this does not mean
+  domain code imports infrastructure implementations.
+- Wiring belongs at the composition boundary. Spring bean annotations, module names, and
+  package locations are implementation choices, not the definition of a layer.
+- A small project can express these boundaries within one module. Additional modules
+  are useful only when they support actual isolation or deployment needs.
 
-Dependencies flow **inward only**:
+## Application vs Domain Logic
 
-- `controller` → `application.service` → `domain` ← `infrastructure`
-- `infrastructure` implements interfaces defined in `domain` (Dependency Inversion).
-- `application.service` depends on `domain` interfaces, not `infrastructure` classes.
+An application service might load an order, call `order.confirm()`, persist it, and arrange
+event delivery. Whether the order can be confirmed belongs in the order's behavior or a
+domain policy, not in controller conditionals or a database mapper.
 
-### What Belongs in Each Layer
+Transactions normally enclose the use case. Choose their actual scope with the aggregate
+consistency requirements and target infrastructure in mind; annotations alone do not define
+the business boundary. Avoid introducing distributed transactions merely to join aggregates.
 
-**controller** — HTTP concern only:
-- Request mapping, path variables, request bodies
-- `@Valid` on inputs
-- Calling the application service
-- Wrapping the response in `R<T>` or `TableDataInfo<?>`
+Request DTOs and response models belong at application/interface boundaries according to
+the project's design. The domain should not need them to enforce its rules. Naming them
+`*Command`, `*Query`, or `*View` is an optional project convention.
 
-**application.service** — orchestration:
-- Transaction management (`@Transactional`)
-- Coordinating multiple domain entities and services
-- Publishing domain events via `DomainEventPublisher`
-- Converting between domain objects and DTOs (private `convertToView()` methods)
-- No business rules — those belong in domain entities
+## Repository and Integration Boundaries
 
-**application.dto** — data transfer objects:
-- `*CreateCommand` / `*SaveCommand` — input for creating new resources
-- `*UpdateCommand` — input for updating existing resources
-- `*Query` / `Query*Command` — filter/sort parameters for queries
-- `*View` — output/response data for the API consumer
-- Group by domain in sub-packages: `dto/workspace/`, `dto/notification/`, etc.
+- Define repository contracts in domain terms, normally around aggregate roots rather
+  than one repository per table. Keep SQL, mapper types, pagination plugins, and persistence
+  entities out of those contracts.
+- Reconstitute aggregates through the chosen mapping strategy. A separate persistence
+  model is useful for isolation but is not mandated for every existing project.
+- Model third-party access as a port when the domain/application needs a capability;
+  implement protocol details in an adapter. Translate external failures at that boundary.
+- Read-only query projections can use a dedicated query path without loading full
+  aggregates. They must not become a back door for bypassing write-side invariants.
 
-**domain** — business core:
-- Aggregate roots (implement `AggregateRoot` marker interface)
-- Value objects (e.g., `WorkspaceId`, `WorkspaceName`)
-- Domain services (stateless logic that spans entities)
-- Domain events (extends `DomainEvent`)
-- Repository **interfaces** (e.g., `WorkspaceRepository`)
+## Cross-Layer Change Review
 
-**infrastructure** — technical details:
-- Repository implementations (extend `ServiceImpl<Mapper, Entity>`)
-- MyBatis mappers (extend `BaseMapper<T>`)
-- Third-party service adapters
-- Custom MyBatis type handlers
+When changing a use case, inspect the relevant domain behavior, repository contract,
+application flow, DTO/API contract, adapter implementation, and tests. Change only what the
+use case requires; do not manufacture empty layers or refactor unrelated modules.
 
-## Package Layout
-
-For a project with base package `com.example.project.backend`:
-
-```
-backend/
-├── config/                        # Spring configuration classes
-├── constant/                      # Application constants
-├── controller/                    # HTTP controllers
-│   ├── WorkspaceController.java
-│   └── NotificationController.java
-├── application/
-│   ├── dto/                       # Data transfer objects
-│   │   ├── workspace/
-│   │   │   ├── CreateWorkspaceCommand.java
-│   │   │   ├── UpdateWorkspaceCommand.java
-│   │   │   ├── QueryWorkspaceCommand.java
-│   │   │   ├── WorkspaceView.java
-│   │   │   └── WorkspaceDetailView.java
-│   │   └── notification/
-│   │       ├── SendNotificationCommand.java
-│   │       └── NotificationView.java
-│   ├── eventhandler/              # Domain event handlers
-│   │   └── WorkspaceEventHandler.java
-│   └── service/                   # Application services
-│       ├── WorkspaceApplicationService.java
-│       └── NotificationApplicationService.java
-├── domain/
-│   ├── AggregateRoot.java         # Marker interface
-│   ├── BaseEntity.java            # Audit fields + logical delete
-│   ├── workspace/                 # Workspace aggregate
-│   │   ├── Workspace.java         # Aggregate root entity
-│   │   ├── WorkspaceMember.java   # Entity within aggregate
-│   │   ├── WorkspaceRepository.java  # Repository interface
-│   │   └── valueobject/
-│   │       ├── WorkspaceId.java
-│   │       └── WorkspaceName.java
-│   ├── event/
-│   │   ├── DomainEvent.java       # Abstract base event
-│   │   ├── DomainEventPublisher.java
-│   │   └── WorkspaceCreatedEvent.java
-│   └── notification/              # Another aggregate
-│       ├── Notification.java
-│       ├── NotificationRepository.java
-│       └── valueobject/
-│           └── NotificationTypeEnum.java
-├── exception/
-│   ├── BizException.java
-│   ├── NotFoundException.java
-│   ├── OperationException.java
-│   ├── OperationPermissionException.java
-│   ├── DeletedException.java
-│   └── GlobalExceptionHandler.java
-├── infrastructure/
-│   ├── persistence/
-│   │   └── mapper/                # MyBatis mapper interfaces
-│   │       ├── WorkspaceMapper.java
-│   │       └── NotificationMapper.java
-│   └── repository/               # Repository implementations
-│       ├── WorkspaceRepositoryImpl.java
-│       └── NotificationRepositoryImpl.java
-└── utils/                         # Utility classes
-```
-
-## Inter-Module Dependencies
-
-```
-api ← core (core implements api interfaces)
-api ← backend (backend uses api models if needed)
-backend does NOT depend on core
-core does NOT depend on backend
-```
-
-When changing an `api` interface:
-1. Update the interface in `api`
-2. Update the `core` controller that implements it
-3. Update any `backend` code that consumes the model
-
-## Core Module
-
-The `core` module is a gateway/proxy service, not a business service. Its structure differs:
-
-```
-core/
-├── config/           # Gateway and Kubernetes client config
-├── controller/       # Proxy controllers (implement api interfaces)
-├── filter/           # Global filters (auth, session)
-├── model/            # Internal models
-├── service/          # Proxy and auth services
-│   └── impl/         # Service implementations
-├── support/          # Utility and helper classes
-└── template/         # Operation templates (e.g., Kubernetes operations)
-```
-
-Key conventions for `core`:
-- Controllers implement interfaces from the `api` module
-- Uses reactive types (`Mono`, `ServerWebExchange`) where the gateway framework requires it
-- Does not follow the same DDD layering as `backend` — it's a thinner proxy layer
+For aggregate and event details, see [domain-modeling.md](domain-modeling.md). For an
+**optional** `api/core/backend` layout and concrete package examples, see
+[project-config.md](project-config.md); that layout is not part of this DDD guidance.

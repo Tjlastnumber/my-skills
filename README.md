@@ -25,7 +25,7 @@
 | --- | --- | --- | --- |
 | [`markdown-to-word`](skills/markdown-to-word/README.md) | 将 Markdown 文稿转换为 DOCX/Word | 内置 `generic-default`、`cn-thesis` 模板，支持 `pandoc + python-docx` 后处理、Markdown 归一化、可选 Mermaid 渲染 | available |
 | [`prd-writer`](skills/prd-writer/README.md) | 两阶段引导式 PRD 生成，产出可用于 vibe coding 的精确需求文档 | 三视角需求诊断、概念版 → 落地版流程、四大盲区自检 | available |
-| [`ddd-spring-boot`](skills/ddd-spring-boot/SKILL.md) | DDD 风格 Spring Boot 项目开发约定 | controller → application.service → domain → infrastructure 分层规范、Maven/Java 配置、代码模板与单元测试约定 | available |
+| [`ddd-spring-boot`](skills/ddd-spring-boot/README.md) | Spring Boot 项目的 DDD 建模与分层设计指南 | DDD 规范与项目推荐约定分离；聚合/值对象/领域事件、独立模板，项目约定由用户选择是否应用 | available |
 | [`mybatis-plus-persistence`](skills/mybatis-plus-persistence/SKILL.md) | DDD 风格 Spring Boot 项目的 MyBatis-Plus 持久层约定 | Mapper/Repository 实现、实体映射注解、Wrapper 查询、BaseEntity 审计字段与逻辑删除 | available |
 | [`database-design`](skills/database-design/SKILL.md) | 数据库设计规范与变更指南 | MySQL/PostgreSQL 双方言 DDL 模板、命名与列规范、枚举/类型策略、迁移脚本与变更检查清单 | available |
 | [`java-best-practices`](skills/java-best-practices/SKILL.md) | oo-tms-agg 项目的 Java 编码规范 | 字符串常量与枚举、Swagger 枚举参数说明、分层 Lombok 用法及日志规范 | available |
